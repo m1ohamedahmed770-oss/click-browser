@@ -1,5 +1,13 @@
 {
   "version": "7",
   "dialect": "mysql",
-  "entries": []
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1764464358318,
+      "tag": "0000_robust_miracleman",
+      "breakpoints": true
+    }
+  ]
 }
