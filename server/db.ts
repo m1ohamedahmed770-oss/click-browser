@@ -1,6 +1,6 @@
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users } from "../drizzle/schema";
+import { InsertUser, users, tasks, agentSessions, executionHistory, bookmarks, Task, AgentSession, ExecutionHistory, Bookmark } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -89,4 +89,134 @@ export async function getUserByOpenId(openId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
-// TODO: add feature queries here as your schema grows.
+// Task management functions
+export async function createTask(userId: number, title: string, description: string, taskType: string, input: Record<string, unknown>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db.insert(tasks).values({
+    userId,
+    title,
+    description,
+    taskType,
+    input,
+    status: "pending",
+  });
+
+  return result;
+}
+
+export async function getUserTasks(userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  return await db.select().from(tasks).where(eq(tasks.userId, userId));
+}
+
+export async function updateTaskStatus(taskId: number, status: "pending" | "running" | "completed" | "failed", result?: Record<string, unknown>, error?: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const updateData: Record<string, unknown> = {
+    status,
+    updatedAt: new Date(),
+  };
+
+  if (status === "completed") {
+    updateData.result = result;
+    updateData.completedAt = new Date();
+  } else if (status === "failed") {
+    updateData.error = error;
+    updateData.completedAt = new Date();
+  }
+
+  return await db.update(tasks).set(updateData).where(eq(tasks.id, taskId));
+}
+
+// Agent session functions
+export async function createAgentSession(userId: number, sessionId: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  return await db.insert(agentSessions).values({
+    userId,
+    sessionId,
+    status: "idle",
+  });
+}
+
+export async function getUserSessions(userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  return await db.select().from(agentSessions).where(eq(agentSessions.userId, userId));
+}
+
+export async function updateSessionStatus(sessionId: string, status: "active" | "idle" | "closed", currentUrl?: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const updateData: Record<string, unknown> = {
+    status,
+    updatedAt: new Date(),
+  };
+
+  if (currentUrl) {
+    updateData.currentUrl = currentUrl;
+  }
+
+  if (status === "closed") {
+    updateData.closedAt = new Date();
+  }
+
+  return await db.update(agentSessions).set(updateData).where(eq(agentSessions.sessionId, sessionId));
+}
+
+// Execution history functions
+export async function logExecution(taskId: number, sessionId: number, action: string, details: Record<string, unknown>, success: boolean = true, errorMessage?: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  return await db.insert(executionHistory).values({
+    taskId,
+    sessionId,
+    action,
+    details,
+    success: success ? "true" : "false",
+    errorMessage,
+  });
+}
+
+export async function getTaskExecutionHistory(taskId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  return await db.select().from(executionHistory).where(eq(executionHistory.taskId, taskId));
+}
+
+// Bookmark functions
+export async function createBookmark(userId: number, title: string, url: string, folder: string = "default") {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  return await db.insert(bookmarks).values({
+    userId,
+    title,
+    url,
+    folder,
+  });
+}
+
+export async function getUserBookmarks(userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  return await db.select().from(bookmarks).where(eq(bookmarks.userId, userId));
+}
+
+export async function deleteBookmark(bookmarkId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  return await db.delete(bookmarks).where(eq(bookmarks.id, bookmarkId));
+}
